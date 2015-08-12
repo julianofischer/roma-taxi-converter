@@ -47,10 +47,17 @@ def conf_argparser():
 def convert_to_dict(line):
     line = line.split(';')
     id = int(line[0])
+    
     date_time = line[1].split('+01')[0]
     position = line[2].split(' ')
-    x_position = position[0].split('POINT(')[1]
-    y_position = position[1].split(')')[0]
+    x_position = float(position[0].split('POINT(')[1])
+    y_position = float(position[1].split(')')[0])
+
+    assert x_position >= -90
+    assert x_position <= 90
+    assert y_position >= -180
+    assert y_position <= 180
+
     position = (x_position, y_position)
     structured_time = strptime(date_time,'%Y-%m-%d %H:%M:%S.%f')
 
@@ -75,9 +82,12 @@ def consumes_line(line):
     
     #updating the simulation clock
     if previous_datetime != UNINITIALIZED:
-        clock = clock + (current_datetime - previous_datetime).total_seconds()
-        
+        time_increment = (current_datetime - previous_datetime).total_seconds()
+        clock = clock + time_increment        
+        assert time_increment >= 0
+
     verify_distance(line)
+    close_still_open_connections()
 
 def verify_distance(line):
     global node_positions
@@ -89,15 +99,18 @@ def verify_distance(line):
             item = node_positions[key]
             #get the distance between the two point in meters
             distance = vincenty(item["position"],line["position"]).meters
+
+            assert distance >= 0
+
             if distance <= range:
                 #the nodes are in contact
-                print "the distance (%d,%d) is %d, a connection will be open" % (item["id"],line["id"],distance)
+                #print "the distance (%d,%d) is %d, a connection will be open" % (item["id"],line["id"],distance)
                 open_connection(item["id"],line["id"],clock)
             else:
                 #check if there are opens connections to close them
                 close_connection(item["id"],line["id"],clock,distance)
 
-def close_connection(from_node,to_node,clock,distance):
+def close_connection(from_node,to_node,clock):
     global open_connections
     global args
     min_value = min (from_node,to_node)
@@ -107,7 +120,7 @@ def close_connection(from_node,to_node,clock,distance):
     if conn_index in open_connections:
         #there is a connection to close
         line = "%d CONN %d %d DOWN\n" % (clock, min_value, max_value)
-        print "The distance (%d,%d) is %d and the connection will be closed" % (from_node, to_node, distance)
+
         with open(args.output,'a') as output_file:
             output_file.write(line)
 
@@ -128,9 +141,15 @@ def open_connection(from_node,to_node,clock):
         open_connections[conn_index] = {"from":min_value, "to":max_value, "clock":clock}
         
         line = "%d CONN %d %d UP\n" % (clock, min_value, max_value)
-        #print args
+
         with open(args.output,'a') as output_file:
             output_file.write(line)
+
+def close_still_open_connections():
+    global clock
+    for conn_index in open_connections.keys():
+        conn = open_connections[conn_index]
+        close_connection(conn["from"],conn["to"],clock)
     
 def main():
     global args
