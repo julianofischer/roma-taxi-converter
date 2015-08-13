@@ -108,7 +108,7 @@ def verify_distance(line):
                 open_connection(item["id"],line["id"],clock)
             else:
                 #check if there are opens connections to close them
-                close_connection(item["id"],line["id"],clock,distance)
+                close_connection(item["id"],line["id"],clock)
 
 def close_connection(from_node,to_node,clock):
     global open_connections
