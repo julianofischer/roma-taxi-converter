@@ -48,7 +48,7 @@ def convert_to_dict(line):
     line = line.split(';')
     id = int(line[0])
     
-    date_time = line[1].split('+01')[0]
+    date_time = line[1].split('+01')[0].split('.')[0]
     position = line[2].split(' ')
     x_position = float(position[0].split('POINT(')[1])
     y_position = float(position[1].split(')')[0])
@@ -59,7 +59,8 @@ def convert_to_dict(line):
     assert y_position <= 180
 
     position = (x_position, y_position)
-    structured_time = strptime(date_time,'%Y-%m-%d %H:%M:%S.%f')
+    #structured_time = strptime(date_time,'%Y-%m-%d %H:%M:%S.%f')
+    structured_time = strptime(date_time,'%Y-%m-%d %H:%M:%S')
 
     #converting do datetime
     structured_time = datetime.fromtimestamp(mktime(structured_time))
