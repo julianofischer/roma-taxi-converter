@@ -29,15 +29,15 @@ cdef int UNINITIALIZED = -1
 cdef int TOTAL_LINES = 21817851
 cdef int lines_read = 0
 cdef int clock = 0
-cdef int current_datetime = UNINITIALIZED
-cdef int previous_datetime = UNINITIALIZED
-node_positions = {}
-cdef int args = UNINITIALIZED
-open_connections = {}
+current_datetime = UNINITIALIZED
+previous_datetime = UNINITIALIZED
+cdef dict node_positions = {}
+args = UNINITIALIZED
+cdef dict open_connections = {}
 cdef int range = UNINITIALIZED
 
 def conf_argparser():
-    cdef str description = "Author: "+__author__ + "\nemail: " + __email__ + "\nLicense: " + __license__ + "\n" '\nProcess the datatrace input and creates a new file containing a connection trace.'
+    description = "Author: "+__author__ + "\nemail: " + __email__ + "\nLicense: " + __license__ + "\n" '\nProcess the datatrace input and creates a new file containing a connection trace.'
 
     parser = argparse.ArgumentParser(description=description, formatter_class=RawTextHelpFormatter)
     parser.add_argument('--range',nargs='?',help="The theoretical transmission range.", default=100,type=int)
@@ -46,21 +46,21 @@ def conf_argparser():
     args=parser.parse_args()
     return args
 
-cdef convert_to_dict(str line):
-    line = line.split(';')
+cdef dict convert_to_dict(str line):
+    cdef list result_line = line.split(';')
     cdef int id = int(line[0])
     
-    cdef str date_time = line[1].split('+01')[0].split('.')[0]
-    cdef str position = line[2].split(' ')
+    date_time = result_line[1].split('+01')[0].split('.')[0]
+    cdef list position = result_line[2].split(' ')
     cdef double x_position = float(position[0].split('POINT(')[1])
     cdef double y_position = float(position[1].split(')')[0])
 
-    assert x_position >= -90
-    assert x_position <= 90
-    assert y_position >= -180
-    assert y_position <= 180
+    #assert x_position >= -90
+    #assert x_position <= 90
+    #assert y_position >= -180
+    #assert y_position <= 180
 
-    position = (x_position, y_position)
+    cdef tuple tuple_position = (x_position, y_position)
     #structured_time = strptime(date_time,'%Y-%m-%d %H:%M:%S.%f')
     structured_time = strptime(date_time,'%Y-%m-%d %H:%M:%S')
 
@@ -68,59 +68,64 @@ cdef convert_to_dict(str line):
     structured_time = datetime.fromtimestamp(mktime(structured_time))
     
     #creating dict item
-    my_dict = {"id":id, "position": position, "date_time":structured_time}
+    cdef dict my_dict = {"id":id, "position": tuple_position, "date_time":structured_time}
     return my_dict
 
-cdef void consumes_line(line):
-    line = convert_to_dict(line)
+cdef void consumes_line(str line):
+    
+    cdef dict dictline = convert_to_dict(line)
+
     global previous_datetime
     global current_datetime
     global node_positions
     global clock
-
-    cdef int node_id = line["id"]
-    previous_datetime = current_datetime
-    current_datetime = line["date_time"]
-    node_positions[node_id] = line
     
-    #updating the simulation clock
-    if previous_datetime != UNINITIALIZED:
-        time_increment = (current_datetime - previous_datetime).total_seconds()
-        clock = clock + time_increment        
-        assert time_increment >= 0
+    cdef int node_id = dictline["id"]
+    previous_datetime = current_datetime
+    current_datetime = dictline["date_time"]
+    cdef int time_increment = 0
+    
+    if node_id not in node_positions or node_positions[node_id]["position"] != dictline["position"]:
+        node_positions[node_id] = dictline
+    
+        #updating the simulation clock
+        if previous_datetime != UNINITIALIZED:
+            time_increment = (current_datetime - previous_datetime).total_seconds()
+            clock = clock + time_increment        
+            #assert time_increment >= 0
 
-    verify_distance(line)
-    close_still_open_connections()
+        verify_distance(dictline)
+        close_still_open_connections()
 
-cdef void verify_distance(line):
+cdef void verify_distance(dict dictline):
     global node_positions
     global range
     global clock
     cdef double distance = 0.0
 
-
+    cdef dict item
     for key in node_positions.keys():
-        if key != line["id"]:
+        if key != dictline["id"]:
             item = node_positions[key]
             #get the distance between the two points in meters
-            distance = vincenty(item["position"],line["position"]).meters
+            distance = vincenty(item["position"],dictline["position"]).meters
 
-            assert distance >= 0
+            #assert distance >= 0
 
             if distance <= range:
                 #the nodes are in contact
                 #print "the distance (%d,%d) is %d, a connection will be open" % (item["id"],line["id"],distance)
-                open_connection(item["id"],line["id"],clock)
+                open_connection(item["id"],dictline["id"],clock)
             else:
                 #check if there are opens connections to close them
-                close_connection(item["id"],line["id"],clock)
+                close_connection(item["id"],dictline["id"],clock)
 
 cdef void close_connection(int from_node,int to_node,int clock):
     global open_connections
     global args
     cdef int min_value = min (from_node,to_node)
     cdef int max_value = max (from_node,to_node)
-    cdef str conn_index = "%d:%d" % (min_value,max_value)
+    conn_index = "%d:%d" % (min_value,max_value)
     
     if conn_index in open_connections:
         #there is a connection to close
@@ -134,14 +139,14 @@ cdef void close_connection(int from_node,int to_node,int clock):
         
     
 
-def open_connection(from_node,to_node,clock):
+cdef void open_connection(int from_node, int to_node,int clock):
     global open_connections
     global args
     cdef int min_value = min (from_node,to_node)
     cdef int max_value = max (from_node,to_node)
     cdef str conn_index = "%d:%d" % (min_value,max_value)
-    cdef str line
     #if the connections isn't already open
+    cdef str line
     if conn_index not in open_connections:
         open_connections[conn_index] = {"from":min_value, "to":max_value, "clock":clock}
         
@@ -156,9 +161,9 @@ def close_still_open_connections():
         conn = open_connections[conn_index]
         close_connection(conn["from"],conn["to"],clock)
 
-def report_progress():
+cdef void report_progress():
     global lines_read
-    percent = (lines_read * 100.0)/TOTAL_LINES
+    cdef float percent = (lines_read * 100.0)/TOTAL_LINES
     print "\n%f%% concluded" % percent
     
     
@@ -173,15 +178,17 @@ def main():
     global range
     range = args.range
     
-    lasttime = time.time()
-
+    cdef int lasttime = time.time()
+    cdef str line
+    cdef int now
     with open(input_file,'r') as input:
          for line in input:
              consumes_line(line)
              lines_read = lines_read + 1
-             if time.time() - lasttime > 60:
+             now = time.time()
+             if now - lasttime > 60:
                  report_progress()
-                 lasttime = time.time()
+                 lasttime = now
 
 if __name__ == "__main__":
     main()
