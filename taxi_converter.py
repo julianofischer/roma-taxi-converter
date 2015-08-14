@@ -14,7 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-import sys
+import sys, time
 import argparse
 from argparse import RawTextHelpFormatter
 from geopy.distance import vincenty
@@ -26,6 +26,8 @@ __license__ = "GPL Version 3"
 __email__ = "julianofischer@gmail.com"
 
 UNINITIALIZED = -1
+TOTAL_LINES = 21817851
+lines_read = 0
 clock = 0
 current_datetime = UNINITIALIZED
 previous_datetime = UNINITIALIZED
@@ -151,8 +153,15 @@ def close_still_open_connections():
     for conn_index in open_connections.keys():
         conn = open_connections[conn_index]
         close_connection(conn["from"],conn["to"],clock)
+
+def report_progress():
+    global lines_read
+    percent = (lines_read * 100.0)/TOTAL_LINES
+    print "\n%f%% concluded" % percent
+    
     
 def main():
+    global lines_read
     global args
     args = conf_argparser()
     
@@ -162,9 +171,15 @@ def main():
     global range
     range = args.range
     
+    lasttime = time.time()
+
     with open(input_file,'r') as input:
          for line in input:
              consumes_line(line)
+             lines_read = lines_read + 1
+             if time.time() - lasttime > 60:
+                 report_progress()
+                 lasttime = time.time()
 
 if __name__ == "__main__":
     main()
