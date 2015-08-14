@@ -1,4 +1,8 @@
 #!/bin/python
+# encoding: utf8
+#to do: verificar se nó se movimento desde a última leitura (se não, não precisa calcular as distâncias novamente).
+###### Na verdade precisa calcular a distância para todo outro nó que se movimentou? -> não pq quando ele movimenta ele já calcula.	
+
 '''
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -13,6 +17,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
+
 
 import sys, time
 import argparse
@@ -81,16 +86,19 @@ def consumes_line(line):
     node_id = line["id"]
     previous_datetime = current_datetime
     current_datetime = line["date_time"]
-    node_positions[node_id] = line
     
-    #updating the simulation clock
-    if previous_datetime != UNINITIALIZED:
-        time_increment = (current_datetime - previous_datetime).total_seconds()
-        clock = clock + time_increment        
-        assert time_increment >= 0
+    # if the node moved
+    if node_id not in node_positions or node_positions[node_id]["position"] != line["position"]:
+        node_positions[node_id] = line
+    
+        #updating the simulation clock
+        if previous_datetime != UNINITIALIZED:
+            time_increment = (current_datetime - previous_datetime).total_seconds()
+            clock = clock + time_increment        
+            assert time_increment >= 0
 
-    verify_distance(line)
-    close_still_open_connections()
+        verify_distance(line)
+        close_still_open_connections()
 
 def verify_distance(line):
     global node_positions
@@ -100,7 +108,7 @@ def verify_distance(line):
     for key in node_positions.keys():
         if key != line["id"]:
             item = node_positions[key]
-            #get the distance between the two point in meters
+            #get the distance between the two points in meters
             distance = vincenty(item["position"],line["position"]).meters
 
             assert distance >= 0
