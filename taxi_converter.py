@@ -63,6 +63,10 @@ def convert_to_dict(line):
     assert x_position >= -90
     assert x_position <= 90
     assert y_position >= -180
+
+
+
+
     assert y_position <= 180
 
     position = (x_position, y_position)
@@ -98,7 +102,6 @@ def consumes_line(line):
             assert time_increment >= 0
 
         verify_distance(line)
-        close_still_open_connections()
 
 def verify_distance(line):
     global node_positions
@@ -115,7 +118,7 @@ def verify_distance(line):
 
             if distance <= range:
                 #the nodes are in contact
-                #print "the distance (%d,%d) is %d, a connection will be open" % (item["id"],line["id"],distance)
+                print "the distance (%d,%d) is %d, a connection will be opened" % (item["id"],line["id"],distance)
                 open_connection(item["id"],line["id"],clock)
             else:
                 #check if there are opens connections to close them
@@ -171,23 +174,26 @@ def report_progress():
 def main():
     global lines_read
     global args
+    global clock
     args = conf_argparser()
     
     input_file = args.datatrace[0]
     #output_file = args.output
 
     global range
-    range = args.range
-    
+    range = args.range    
     lasttime = time.time()
 
     with open(input_file,'r') as input:
-         for line in input:
-             consumes_line(line)
-             lines_read = lines_read + 1
-             if time.time() - lasttime > 60:
-                 report_progress()
-                 lasttime = time.time()
+       for line in input:
+            consumes_line(line)
+            lines_read = lines_read + 1
+            if time.time() - lasttime > 60:
+                report_progress()
+                lasttime = time.time()
+        
+        close_still_open_connections()
+
 
 if __name__ == "__main__":
     main()

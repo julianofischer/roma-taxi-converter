@@ -95,7 +95,6 @@ cdef void consumes_line(str line):
             #assert time_increment >= 0
 
         verify_distance(dictline)
-        close_still_open_connections()
 
 cdef void verify_distance(dict dictline):
     global node_positions
@@ -182,13 +181,15 @@ def main():
     cdef str line
     cdef int now
     with open(input_file,'r') as input:
-         for line in input:
-             consumes_line(line)
-             lines_read = lines_read + 1
-             now = time.time()
-             if now - lasttime > 60:
-                 report_progress()
-                 lasttime = now
+        for line in input:
+            consumes_line(line)
+            lines_read = lines_read + 1
+            now = time.time()
+            if now - lasttime > 60:
+                report_progress()
+                lasttime = now
+         
+        close_still_open_connections()
 
 if __name__ == "__main__":
     main()
