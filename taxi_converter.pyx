@@ -122,34 +122,38 @@ cdef void verify_distance(dict dictline):
 cdef void close_connection(int from_node,int to_node,int clock):
     global open_connections
     global args
-    cdef int min_value = min (from_node,to_node)
-    cdef int max_value = max (from_node,to_node)
-    conn_index = "%d:%d" % (min_value,max_value)
+    cdef str conn_index_1 = "%d:%d" % (from_node,to_node)
+    cdef str conn_index_2 = "%d:%d" % (to_node, from_node)
     
-    if conn_index in open_connections:
+    if conn_index_1 in open_connections or conn_index_2 in open_connections:
         #there is a connection to close
-        line = "%d CONN %d %d DOWN\n" % (clock, min_value, max_value)
+        line = "%d CONN %d %d DOWN\n" % (clock, from_node, to_node)
 
         with open(args.output,'a') as output_file:
             output_file.write(line)
 
         #remove the connn from the dict
-        del open_connections[conn_index]
+    
+    if conn_index_1 in open_connections:
+        del open_connections[conn_index_1]
+
+    if conn_index_2 in open_connections:
+        del open_connections[conn_index_2]
         
     
 
 cdef void open_connection(int from_node, int to_node,int clock):
     global open_connections
     global args
-    cdef int min_value = min (from_node,to_node)
-    cdef int max_value = max (from_node,to_node)
-    cdef str conn_index = "%d:%d" % (min_value,max_value)
+    cdef str conn_index_1 = "%d:%d" % (from_node,to_node)
+    cdef str conn_index_2 = "%d:%d" % (to_node, from_node)
+
     #if the connections isn't already open
     cdef str line
-    if conn_index not in open_connections:
-        open_connections[conn_index] = {"from":min_value, "to":max_value, "clock":clock}
+    if conn_index_1 not in open_connections and conn_index_2 not in open_connections:
+        open_connections[conn_index_1] = {"from":from_node, "to":to_node, "clock":clock}
         
-        line = "%d CONN %d %d UP\n" % (clock, min_value, max_value)
+        line = "%d CONN %d %d UP\n" % (clock, from_node, to_node)
 
         with open(args.output,'a') as output_file:
             output_file.write(line)
